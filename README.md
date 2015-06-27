@@ -2,6 +2,10 @@
 
 [Read Exploring ES6 | Leanpub](https://leanpub.com/exploring-es6/read "Read Exploring ES6 | Leanpub") の写経
 
+## Env
+
+io.js@2.3.1
+
 ## Contributing
 
 1. Fork it!
