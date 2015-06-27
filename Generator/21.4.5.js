@@ -2,11 +2,12 @@
 function *genFunc() {
     try {
         console.log("started");
-        yield 1;
+        yield; //*!
     } catch (error) {
         console.log("Caught:" + error);
     }
 }
 let genObj = genFunc();
 genObj.next();
-genObj.throw(new Error("problem"));
+var res = genObj.throw(new Error("problem"));// => *!
+console.log(res);// value: undefined
