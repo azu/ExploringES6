@@ -1,58 +1,94 @@
-// LICENSE : MIT
-"use strict";
-var createReadStream = require("fs").createReadStream;
-var coroutine = require("./lib/coroutine");
+//------------------- The processing chain
+
+import {createReadStream} from 'fs';
+
+/**
+ * Create an asynchronous ReadStream for the file whose name
+ * is `fileName` and feed it to the generator object `target`.
+ *
+ * @see ReadStream https://nodejs.org/api/fs.html#fs_class_fs_readstream
+ */
 function readFile(fileName, target) {
-    let readStream = createReadStream(fileName, {
-        encoding: "utf8",
-        bufferSize: 1024
-    });
-    readStream.on("data", function (buffer) {
-        let str = buffer.toString("utf8");
+    let readStream = createReadStream(fileName, { encoding: 'utf8', bufferSize: 1024 });
+    readStream.on('data', buffer => {
+        let str = buffer.toString('utf8');
         target.next(str);
     });
-    readStream.on("end", function () {
+    readStream.on('end', () => {
+        // Signal end of output sequence
         target.return();
-    })
+    });
 }
 
-
-const splitLines = coroutine(function *(target) {
-    let previous = "";
+/**
+ * Turns a sequence of text chunks into a sequence of lines
+ * (where lines are separated by newlines)
+ */
+const splitLines = coroutine(function* (target) {
+    let previous = '';
     try {
         while (true) {
             previous += yield;
-            let eoIndex;
-            while ((eoIndex = previous.indexOf("\n")) >= 0) {
-                let line = previous.slice(0, eoIndex);
+            let eolIndex;
+            while ((eolIndex = previous.indexOf('\n')) >= 0) {
+                let line = previous.slice(0, eolIndex);
                 target.next(line);
-                previous = previous.slice(eoIndex + 1);
+                previous = previous.slice(eolIndex+1);
             }
         }
-    } catch(e){console.log(e.stack)}finally {
+    } finally {
+        // Handle the end of the input sequence
+        // (signaled via `return()`)
         if (previous.length > 0) {
             target.next(previous);
         }
+        // Signal end of output sequence
         target.return();
     }
 });
 
-const numberLines = coroutine(function *(target) {
+/**
+ * Prefixes numbers to a sequence of lines
+ */
+const numberLines = coroutine(function* (target) {
     try {
-        for (let lineNo = 0;; lineNo++) {
+        for (let lineNo = 0; ; lineNo++) {
             let line = yield;
             target.next(`${lineNo}: ${line}`);
         }
-    } catch(e){console.log(e.stack)} finally {
+    } finally {
+        // Signal end of output sequence
         target.return();
     }
 });
 
-const printLines = coroutine(function *() {
+/**
+ * Receives a sequence of lines (without newlines)
+ * and logs them (adding newlines).
+ */
+const printLines = coroutine(function* () {
     while (true) {
         let line = yield;
         console.log(line);
     }
 });
 
-readFile(__dirname + "/21.4.5.1.js", splitLines(numberLines(printLines())));
+//------------------- Helper function
+
+/**
+ * Returns a function that, when called,
+ * returns a generator object that is immediately
+ * ready for input via `next()`
+ */
+function coroutine(generatorFunction) {
+    return function (...args) {
+        let generatorObject = generatorFunction(...args);
+        generatorObject.next();
+        return generatorObject;
+    };
+}
+
+//------------------- Main
+
+let fileName = process.argv[2];
+readFile(fileName, splitLines(numberLines(printLines())));
